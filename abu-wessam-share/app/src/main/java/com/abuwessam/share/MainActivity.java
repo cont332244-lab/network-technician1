@@ -13,7 +13,9 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ImageView;
 import android.graphics.Bitmap;
-import android.graphics.Color;\nimport android.graphics.drawable.GradientDrawable;\nimport androidx.core.content.FileProvider;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import androidx.core.content.FileProvider;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.qrcode.QRCodeWriter;
 import android.widget.ScrollView;
@@ -191,7 +193,44 @@ public class MainActivity extends Activity {
         }
     }
 
-    private GradientDrawable roundBg(int color, int radius) {\n        GradientDrawable d = new GradientDrawable();\n        d.setColor(color);\n        d.setCornerRadius(radius);\n        return d;\n    }\n\n    private Button makeButton(String label, int color) {\n        Button b = new Button(this);\n        b.setText(label);\n        b.setTextColor(Color.WHITE);\n        b.setTextSize(15);\n        b.setAllCaps(false);\n        b.setBackground(roundBg(color, dp(14)));\n        if (android.os.Build.VERSION.SDK_INT >= 21) b.setElevation(dp(2));\n        return b;\n    }\n\n    private void shareAppApk() {\n        try {\n            File source = new File(getApplicationInfo().sourceDir);\n            File copy = new File(getCacheDir(), "Abu-Wessam-SHARE.apk");\n            try (InputStream in = new FileInputStream(source); FileOutputStream out = new FileOutputStream(copy)) {\n                byte[] buffer = new byte[32768]; int count;\n                while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);\n            }\n            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", copy);\n            Intent share = new Intent(Intent.ACTION_SEND);\n            share.setType("application/vnd.android.package-archive");\n            share.putExtra(Intent.EXTRA_STREAM, uri);\n            share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);\n            startActivity(Intent.createChooser(share, "إرسال أبو وسام SHARE عبر البلوتوث أو تطبيق آخر"));\n        } catch (Exception e) {\n            Toast.makeText(this, "تعذّر تجهيز ملف التطبيق للمشاركة: " + e.getMessage(), Toast.LENGTH_LONG).show();\n        }\n    }\n\n    private LinearLayout.LayoutParams match() {
+    private GradientDrawable roundBg(int color, int radius) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(radius);
+        return d;
+    }
+
+    private Button makeButton(String label, int color) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(15);
+        b.setAllCaps(false);
+        b.setBackground(roundBg(color, dp(14)));
+        if (android.os.Build.VERSION.SDK_INT >= 21) b.setElevation(dp(2));
+        return b;
+    }
+
+    private void shareAppApk() {
+        try {
+            File source = new File(getApplicationInfo().sourceDir);
+            File copy = new File(getCacheDir(), "Abu-Wessam-SHARE.apk");
+            try (InputStream in = new FileInputStream(source); FileOutputStream out = new FileOutputStream(copy)) {
+                byte[] buffer = new byte[32768]; int count;
+                while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+            }
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", copy);
+            Intent share = new Intent(Intent.ACTION_SEND);
+            share.setType("application/vnd.android.package-archive");
+            share.putExtra(Intent.EXTRA_STREAM, uri);
+            share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(share, "إرسال أبو وسام SHARE عبر البلوتوث أو تطبيق آخر"));
+        } catch (Exception e) {
+            Toast.makeText(this, "تعذّر تجهيز ملف التطبيق للمشاركة: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private LinearLayout.LayoutParams match() {
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
         p.bottomMargin = dp(8);
         return p;
