@@ -217,7 +217,8 @@ public class MainActivity extends Activity {
             }
             String ip = getLocalIp();
             if (ip == null) ip = "تعذّر تحديد IP؛ تأكد من اتصال Wi‑Fi";
-            status.setText("المشاركة تعمل\nافتح من الجهاز الآخر:\nhttp://" + ip + ":8765");
+            status.setText("جاهز للإرسال! امسح الرمز من الهاتف الآخر.\nhttp://" + ip + ":8765");
+            showQr("http://" + ip + ":8765");
             Toast.makeText(this, "بدأت المشاركة على المنفذ 8765", Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             status.setText("تعذّر تشغيل المشاركة: " + e.getMessage());
