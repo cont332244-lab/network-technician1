@@ -53,6 +53,20 @@ public class MainActivity extends Activity {
     private ShareServer server;
     private boolean highSpeed = true;
     private android.webkit.ValueCallback<Uri[]> fileChooserCallback;
+    private final android.os.Handler speedHandler = new android.os.Handler();
+    private final Runnable speedTicker = new Runnable() {
+        @Override public void run() {
+            if (server != null && status != null) {
+                status.setText("سرعة النقل: " + formatRate(server.transferSpeed) + (server.transferTotal > 0 ? String.format(java.util.Locale.US, " — %.0f%%", Math.min(100.0, server.transferBytes * 100.0 / server.transferTotal)) : "") + "\\n" + server.transferLabel);
+                speedHandler.postDelayed(this, 500);
+            }
+        }
+    };
+    private String formatRate(double rate) {
+        if (rate >= 1048576) return String.format(java.util.Locale.US, "%.2f MB/s", rate / 1048576.0);
+        if (rate >= 1024) return String.format(java.util.Locale.US, "%.1f KB/s", rate / 1024.0);
+        return String.format(java.util.Locale.US, "%.0f B/s", rate);
+    }
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -371,6 +385,8 @@ public class MainActivity extends Activity {
             if (ip == null) ip = "تعذّر تحديد IP؛ تأكد من اتصال Wi‑Fi";
             status.setText("جاهز للاستقبال — دع الهاتف الآخر يضغط إرسال ويمسح الرمز.\nhttp://" + ip + ":8765\nالوضع: " + (highSpeed ? "سرعة عالية" : "سرعة عادية"));
             showQr("http://" + ip + ":8765");
+            speedHandler.removeCallbacks(speedTicker);
+            speedHandler.post(speedTicker);
             Toast.makeText(this, "بدأت المشاركة على المنفذ 8765", Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             status.setText("تعذّر تشغيل المشاركة: " + e.getMessage());
@@ -380,6 +396,7 @@ public class MainActivity extends Activity {
 
     private void stopSharing() {
         if (server != null) { server.stop(); server = null; }
+        speedHandler.removeCallbacks(speedTicker);
         status.setText("الحالة: متوقف");
     }
 
@@ -406,10 +423,36 @@ public class MainActivity extends Activity {
     }
 
     private class ShareServer extends NanoHTTPD {
+        volatile long transferBytes = 0;
+        volatile long transferTotal = 0;
+        volatile double transferSpeed = 0;
+        volatile String transferLabel = "بانتظار نقل الملفات";
+        private long lastAt = 0;
+        private long lastBytes = 0;
         ShareServer() { super("0.0.0.0", 8765); }
+
+        private synchronized void updateProgress(long bytes, long total, String label) {
+            long now = System.currentTimeMillis();
+            transferSpeed = lastAt > 0 && now > lastAt && bytes >= lastBytes ? (bytes - lastBytes) * 1000.0 / (now - lastAt) : 0;
+            transferBytes = bytes; transferTotal = total; transferLabel = label;
+            lastAt = now; lastBytes = bytes;
+        }
 
         @Override public Response serve(IHTTPSession session) {
             String uri = session.getUri();
+            if (Method.GET.equals(session.getMethod()) && "/status".equals(uri)) {
+                return newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", "{\\"bytes\\":" + transferBytes + ",\\"total\\":" + transferTotal + ",\\"speed\\":" + (long)transferSpeed + "}");
+            }
+            if (Method.GET.equals(session.getMethod()) && uri.startsWith("/progress")) {
+                try {
+                    Map<String,String> q = session.getParms();
+                    transferBytes = Long.parseLong(q.getOrDefault("bytes", "0"));
+                    transferTotal = Long.parseLong(q.getOrDefault("total", "0"));
+                    transferSpeed = Double.parseDouble(q.getOrDefault("speed", "0"));
+                    transferLabel = "استقبال ملف من الهاتف الآخر";
+                } catch (Exception ignored) { }
+                return newFixedLengthResponse("ok");
+            }
             if (Method.GET.equals(session.getMethod()) && "/".equals(uri)) return htmlPage();
             if (Method.GET.equals(session.getMethod()) && uri.startsWith("/file/")) {
                 try {
