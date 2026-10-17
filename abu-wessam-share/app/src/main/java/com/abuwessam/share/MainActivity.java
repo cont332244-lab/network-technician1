@@ -21,6 +21,10 @@ import com.google.zxing.qrcode.QRCodeWriter;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.app.DownloadManager;
+import android.os.Environment;
 
 import fi.iki.elonen.NanoHTTPD;
 
@@ -177,6 +181,35 @@ public class MainActivity extends Activity {
         integrator.initiateScan();
     }
 
+    private void openScannedPage(String url) {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(0xFFF3F6FB);
+        Button back = makeButton("رجوع إلى أبو وسام SHARE", 0xFF102A43);
+        page.addView(back, match());
+        WebView web = new WebView(this);
+        web.getSettings().setJavaScriptEnabled(false);
+        web.setWebViewClient(new WebViewClient());
+        web.setDownloadListener((downloadUrl, userAgent, contentDisposition, mimeType, contentLength) -> {
+            try {
+                DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
+                request.setTitle("تنزيل ملف من أبو وسام SHARE");
+                request.setDescription("جارٍ تنزيل الملف");
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "AbuWessam_" + System.currentTimeMillis());
+                DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                manager.enqueue(request);
+                Toast.makeText(this, "بدأ تنزيل الملف", Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {
+                Toast.makeText(this, "تعذّر تنزيل الملف: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        });
+        page.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
+        back.setOnClickListener(v -> buildUi());
+        setContentView(page);
+        web.loadUrl(url);
+    }
+
     private void showQr(String text) {
         try {
             com.google.zxing.common.BitMatrix matrix = new QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 600, 600);
@@ -252,8 +285,8 @@ public class MainActivity extends Activity {
         if (scanResult != null) {
             String scanned = scanResult.getContents();
             if (scanned != null && (scanned.startsWith("http://") || scanned.startsWith("https://"))) {
-                try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(scanned))); }
-                catch (Exception e) { status.setText("تعذّر فتح رابط المشاركة."); }
+                try { openScannedPage(scanned); }
+                catch (Exception e) { status.setText("تعذّر فتح صفحة المشاركة داخل التطبيق."); }
             } else if (scanned != null) {
                 Toast.makeText(this, "رمز غير صالح. امسح رمز أبو وسام SHARE.", Toast.LENGTH_LONG).show();
             }
