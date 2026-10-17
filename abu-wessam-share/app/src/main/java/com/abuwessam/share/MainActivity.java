@@ -460,8 +460,16 @@ public class MainActivity extends Activity {
                     if (index < 0 || index >= selectedUris.size()) return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "الملف غير موجود");
                     Uri fileUri = selectedUris.get(index);
                     String name = selectedNames.get(index);
-                    InputStream stream = getContentResolver().openInputStream(fileUri);
-                    if (stream == null) return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "تعذّر فتح الملف");
+                    InputStream original = getContentResolver().openInputStream(fileUri);
+                    if (original == null) return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "تعذّر فتح الملف");
+                    long total = getFileSize(fileUri);
+                    updateProgress(0, total, "إرسال: " + name);
+                    InputStream stream = new java.io.FilterInputStream(original) {
+                        long sent = 0;
+                        private void tick(int n) { if (n > 0) { sent += n; updateProgress(sent, total, "إرسال: " + name); } }
+                        @Override public int read() throws java.io.IOException { int b = super.read(); if (b >= 0) tick(1); return b; }
+                        @Override public int read(byte[] b, int off, int len) throws java.io.IOException { int n = super.read(b, off, len); tick(n); return n; }
+                    };
                     Response r = newChunkedResponse(Response.Status.OK, "application/octet-stream", stream);
                     r.addHeader("Content-Disposition", "attachment; filename*=UTF-8''" + encode(name));
                     return r;
@@ -471,13 +479,25 @@ public class MainActivity extends Activity {
             return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not found");
         }
 
+        private long getFileSize(Uri uri) {
+            Cursor cur = null;
+            try {
+                cur = getContentResolver().query(uri, new String[]{OpenableColumns.SIZE}, null, null, null);
+                if (cur != null && cur.moveToFirst()) {
+                    int col = cur.getColumnIndex(OpenableColumns.SIZE);
+                    if (col >= 0 && !cur.isNull(col)) return cur.getLong(col);
+                }
+            } catch (Exception ignored) { } finally { if (cur != null) cur.close(); }
+            return 0;
+        }
+
         private Response htmlPage() {
-            StringBuilder h = new StringBuilder("<!doctype html><html lang='ar' dir='rtl'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>أبو وسام SHARE</title><body style='font-family:sans-serif;max-width:760px;margin:24px auto;padding:0 16px;background:#f3f6fa;color:#102a43'><h1>أبو وسام SHARE</h1><h2>تنزيل الملفات</h2><ul>");
+            StringBuilder h = new StringBuilder("<!doctype html><html lang='ar' dir='rtl'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>أبو وسام SHARE</title><body style='font-family:sans-serif;max-width:760px;margin:24px auto;padding:0 16px;background:#f3f6fa;color:#102a43'><h1>أبو وسام SHARE</h1><section style='background:white;border-radius:16px;padding:14px;margin:12px 0'><b>سرعة النقل</b><p id='rate'>0 KB/s</p><div style='height:12px;background:#d9e2ec;border-radius:10px;overflow:hidden'><div id='bar' style='height:100%;width:0%;background:#087f8c'></div></div><p id='pct'>0%</p></section><h2>تنزيل الملفات</h2><ul>");
             synchronized (selectedNames) {
                 for (int i=0; i<selectedNames.size(); i++) h.append("<li style='margin:12px 0'><a href='/file/").append(i).append("'>").append(escape(selectedNames.get(i))).append("</a></li>");
             }
             if (selectedNames.isEmpty()) h.append("<li>لم يحدد المضيف ملفات للإرسال.</li>");
-            h.append("</ul><hr><h2>إرسال ملف إلى هذا الهاتف</h2><form action='/upload' method='post' enctype='multipart/form-data'><input type='file' name='file' required><p><button type='submit'>رفع الملف</button></p></form><p>اترك تطبيق أبو وسام SHARE مفتوحًا على الهاتف المضيف أثناء النقل.</p></body></html>");
+            h.append("</ul><hr><h2>إرسال ملف إلى هذا الهاتف</h2><input id='file' type='file' required><p><button onclick='sendFile()'>رفع الملف</button></p><p id='msg'>اختر ملفًا لبدء الإرسال.</p><script>function human(n){if(n>=1048576)return (n/1048576).toFixed(2)+' MB/s';if(n>=1024)return (n/1024).toFixed(1)+' KB/s';return Math.round(n)+' B/s'}function sendFile(){let f=document.getElementById('file').files[0];if(!f)return;let x=new XMLHttpRequest(),t=Date.now();x.open('POST','/upload');x.upload.onprogress=e=>{if(e.lengthComputable){let s=e.loaded/Math.max(.001,(Date.now()-t)/1000);document.getElementById('rate').textContent=human(s);document.getElementById('bar').style.width=(e.loaded/e.total*100)+'%';document.getElementById('pct').textContent=Math.floor(e.loaded/e.total*100)+'%';document.getElementById('msg').textContent='جارٍ الإرسال: '+human(s);fetch('/progress?bytes='+e.loaded+'&total='+e.total+'&speed='+s).catch(()=>{});}};x.onload=()=>document.getElementById('msg').textContent=x.status===200?'اكتمل الإرسال':'تعذّر الإرسال';x.onerror=()=>document.getElementById('msg').textContent='انقطع الاتصال';let d=new FormData();d.append('file',f,f.name);x.send(d)}function poll(){fetch('/status').then(r=>r.json()).then(s=>{if(s.total>0){document.getElementById('rate').textContent=human(s.speed);document.getElementById('bar').style.width=Math.min(100,s.bytes*100/s.total)+'%';document.getElementById('pct').textContent=Math.floor(Math.min(100,s.bytes*100/s.total))+'%';}}).catch(()=>{});setTimeout(poll,500)}poll();</script><p>اترك تطبيق أبو وسام SHARE مفتوحًا على الهاتف المضيف أثناء النقل.</p></body></html>");
             return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", h.toString());
         }
 
@@ -494,9 +514,11 @@ public class MainActivity extends Activity {
                 File dir = getExternalFilesDir(null);
                 if (dir == null) dir = getFilesDir();
                 File dest = new File(dir, System.currentTimeMillis() + "_" + original);
+                long total = new File(tempPath).length();
+                updateProgress(0, total, "استقبال: " + original);
                 try (InputStream in = new FileInputStream(tempPath); FileOutputStream out = new FileOutputStream(dest)) {
-                    byte[] buffer = new byte[32768]; int count;
-                    while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+                    byte[] buffer = new byte[highSpeed ? 262144 : 32768]; int count; long copied = 0;
+                    while ((count = in.read(buffer)) != -1) { out.write(buffer, 0, count); copied += count; updateProgress(copied, total, "حفظ: " + original); }
                 }
                 String page = "<html lang='ar' dir='rtl'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;padding:24px'><h2>تم استلام الملف</h2><p>" + escape(original) + "</p><p>حُفظ داخل مجلد التطبيق. يمكنك العودة للصفحة الرئيسية لإرسال ملفات أخرى.</p><a href='/'>عودة</a></body></html>";
                 return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", page);
