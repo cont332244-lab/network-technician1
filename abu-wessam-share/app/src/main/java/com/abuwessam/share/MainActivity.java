@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
     private final Runnable speedTicker = new Runnable() {
         @Override public void run() {
             if (server != null && status != null) {
-                status.setText("سرعة النقل: " + formatRate(server.transferSpeed) + (server.transferTotal > 0 ? String.format(java.util.Locale.US, " — %.0f%%", Math.min(100.0, server.transferBytes * 100.0 / server.transferTotal)) : "") + "\\n" + server.transferLabel);
+                status.setText("سرعة النقل: " + formatRate(server.transferSpeed) + (server.transferTotal > 0 ? String.format(java.util.Locale.US, " — %.0f%%", Math.min(100.0, server.transferBytes * 100.0 / server.transferTotal)) : "") + "\n" + server.transferLabel);
                 speedHandler.postDelayed(this, 500);
             }
         }
