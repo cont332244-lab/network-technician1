@@ -13,7 +13,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ImageView;
 import android.graphics.Bitmap;
-import android.graphics.Color;
+import android.graphics.Color;\nimport android.graphics.drawable.GradientDrawable;\nimport androidx.core.content.FileProvider;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.qrcode.QRCodeWriter;
 import android.widget.ScrollView;
@@ -54,70 +54,115 @@ public class MainActivity extends Activity {
     }
 
     private void buildUi() {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(0xFFF3F6FB);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setPadding(dp(18), dp(20), dp(18), dp(16));
-        root.setBackgroundColor(0xFFF2F6FA);
+        root.setPadding(dp(18), dp(18), dp(18), dp(24));
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
+
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setGravity(Gravity.CENTER);
+        hero.setPadding(dp(18), dp(22), dp(18), dp(22));
+        hero.setBackground(roundBg(0xFF102A43, dp(24)));
+        root.addView(hero, match());
+
+        TextView logo = new TextView(this);
+        logo.setText("AW");
+        logo.setTextSize(23);
+        logo.setTypeface(null, 1);
+        logo.setTextColor(0xFF102A43);
+        logo.setGravity(Gravity.CENTER);
+        logo.setBackground(roundBg(0xFFFFFFFF, dp(40)));
+        hero.addView(logo, new LinearLayout.LayoutParams(dp(66), dp(66)));
 
         TextView brand = new TextView(this);
         brand.setText("أبو وسام SHARE");
-        brand.setTextSize(29);
-        brand.setTextColor(0xFF102A43);
+        brand.setTextSize(27);
+        brand.setTextColor(Color.WHITE);
         brand.setGravity(Gravity.CENTER);
         brand.setTypeface(null, 1);
-        root.addView(brand, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, -2);
+        bp.topMargin = dp(10);
+        hero.addView(brand, bp);
 
         TextView intro = new TextView(this);
-        intro.setText("أرسل واستقبل ملفاتك بسهولة");
-        intro.setTextSize(16);
-        intro.setTextColor(0xFF486581);
+        intro.setText("مشاركة ملفاتك بسرعة وبسهولة");
+        intro.setTextSize(15);
+        intro.setTextColor(0xFFD9E7F5);
         intro.setGravity(Gravity.CENTER);
-        intro.setPadding(0, dp(8), 0, dp(14));
-        root.addView(intro);
+        intro.setPadding(0, dp(6), 0, 0);
+        hero.addView(intro);
 
-        Button send = new Button(this);
-        send.setText("إرسال ملفات");
+        TextView section = new TextView(this);
+        section.setText("اختر طريقة المشاركة");
+        section.setTextSize(17);
+        section.setTypeface(null, 1);
+        section.setTextColor(0xFF102A43);
+        section.setPadding(dp(4), dp(18), dp(4), dp(8));
+        root.addView(section);
+
+        Button send = makeButton("📁  اختيار ملفات للإرسال", 0xFF1769AA);
         root.addView(send, match());
         send.setOnClickListener(v -> chooseFiles());
 
-        Button start = new Button(this);
-        start.setText("إنشاء رمز QR للمشاركة");
+        Button start = makeButton("▦  عرض رمز QR للاستقبال", 0xFF087F8C);
         root.addView(start, match());
         start.setOnClickListener(v -> startSharing());
 
-        Button receive = new Button(this);
-        receive.setText("استقبال — تصوير رمز QR");
+        Button receive = makeButton("📷  استقبال — مسح QR", 0xFF4054B2);
         root.addView(receive, match());
         receive.setOnClickListener(v -> scanQr());
+
+        Button bluetooth = makeButton("ᛒ  مشاركة التطبيق عبر البلوتوث", 0xFF6842A6);
+        root.addView(bluetooth, match());
+        bluetooth.setOnClickListener(v -> shareAppApk());
+
+        LinearLayout qrCard = new LinearLayout(this);
+        qrCard.setOrientation(LinearLayout.VERTICAL);
+        qrCard.setGravity(Gravity.CENTER);
+        qrCard.setPadding(dp(14), dp(12), dp(14), dp(12));
+        qrCard.setBackground(roundBg(Color.WHITE, dp(18)));
+        LinearLayout.LayoutParams cardParams = match();
+        cardParams.topMargin = dp(8);
+        root.addView(qrCard, cardParams);
+
+        TextView qrTitle = new TextView(this);
+        qrTitle.setText("رمز الاتصال");
+        qrTitle.setTextSize(16);
+        qrTitle.setTypeface(null, 1);
+        qrTitle.setTextColor(0xFF102A43);
+        qrCard.addView(qrTitle);
 
         qrView = new ImageView(this);
         qrView.setAdjustViewBounds(true);
         qrView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        LinearLayout.LayoutParams qrp = new LinearLayout.LayoutParams(dp(220), dp(220));
-        qrp.topMargin = dp(8);
-        root.addView(qrView, qrp);
+        qrView.setVisibility(View.GONE);
+        LinearLayout.LayoutParams qrp = new LinearLayout.LayoutParams(dp(240), dp(240));
+        qrp.topMargin = dp(6);
+        qrCard.addView(qrView, qrp);
 
         status = new TextView(this);
-        status.setText("اختر إرسال أو استقبال للبدء.");
-        status.setTextSize(15);
-        status.setTextColor(0xFF102A43);
+        status.setText("جاهز — اختر إرسالًا أو استقبالًا.");
+        status.setTextSize(14);
+        status.setTextColor(0xFF334E68);
         status.setGravity(Gravity.CENTER);
-        status.setPadding(dp(4), dp(8), dp(4), dp(8));
-        root.addView(status, new LinearLayout.LayoutParams(-1, -2));
+        status.setPadding(dp(6), dp(12), dp(6), dp(12));
+        qrCard.addView(status, new LinearLayout.LayoutParams(-1, -2));
 
         filesView = new TextView(this);
         filesView.setText("لم تختر ملفات بعد.");
         filesView.setTextSize(14);
         filesView.setTextColor(0xFF334E68);
-        filesView.setPadding(dp(8), dp(6), dp(8), dp(6));
-        root.addView(filesView, new LinearLayout.LayoutParams(-1, 0, 1));
+        filesView.setPadding(dp(8), dp(8), dp(8), dp(8));
+        root.addView(filesView, new LinearLayout.LayoutParams(-1, -2));
 
-        Button stop = new Button(this);
-        stop.setText("إيقاف المشاركة");
+        Button stop = makeButton("إيقاف المشاركة", 0xFF9B2C2C);
         root.addView(stop, match());
         stop.setOnClickListener(v -> stopSharing());
-        setContentView(root);
+        setContentView(scroll);
     }
 
     private void scanQr() {
@@ -146,7 +191,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private LinearLayout.LayoutParams match() {
+    private GradientDrawable roundBg(int color, int radius) {\n        GradientDrawable d = new GradientDrawable();\n        d.setColor(color);\n        d.setCornerRadius(radius);\n        return d;\n    }\n\n    private Button makeButton(String label, int color) {\n        Button b = new Button(this);\n        b.setText(label);\n        b.setTextColor(Color.WHITE);\n        b.setTextSize(15);\n        b.setAllCaps(false);\n        b.setBackground(roundBg(color, dp(14)));\n        if (android.os.Build.VERSION.SDK_INT >= 21) b.setElevation(dp(2));\n        return b;\n    }\n\n    private void shareAppApk() {\n        try {\n            File source = new File(getApplicationInfo().sourceDir);\n            File copy = new File(getCacheDir(), "Abu-Wessam-SHARE.apk");\n            try (InputStream in = new FileInputStream(source); FileOutputStream out = new FileOutputStream(copy)) {\n                byte[] buffer = new byte[32768]; int count;\n                while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);\n            }\n            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", copy);\n            Intent share = new Intent(Intent.ACTION_SEND);\n            share.setType("application/vnd.android.package-archive");\n            share.putExtra(Intent.EXTRA_STREAM, uri);\n            share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);\n            startActivity(Intent.createChooser(share, "إرسال أبو وسام SHARE عبر البلوتوث أو تطبيق آخر"));\n        } catch (Exception e) {\n            Toast.makeText(this, "تعذّر تجهيز ملف التطبيق للمشاركة: " + e.getMessage(), Toast.LENGTH_LONG).show();\n        }\n    }\n\n    private LinearLayout.LayoutParams match() {
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
         p.bottomMargin = dp(8);
         return p;
