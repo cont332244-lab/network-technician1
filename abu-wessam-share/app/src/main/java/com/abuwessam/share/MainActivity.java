@@ -76,127 +76,236 @@ public class MainActivity extends Activity {
     }
 
     private void buildUi() {
+        // Classic SHAREit-inspired layout, recolored and branded for Abu Wessam.
+        final int ink = 0xFF24213A;
+        final int purple = 0xFF6C42C1;
+        final int orange = 0xFFFF8A3D;
+        final int pale = 0xFFF6F3FC;
+        getWindow().setStatusBarColor(0xFF56339D);
+        getWindow().setNavigationBarColor(0xFF56339D);
+
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
-        scroll.setBackgroundColor(0xFFF3F6FB);
+        scroll.setBackgroundColor(pale);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(18), dp(18), dp(24));
+        root.setPadding(0, 0, 0, dp(18));
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
-        LinearLayout hero = new LinearLayout(this);
-        hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setGravity(Gravity.CENTER);
-        hero.setPadding(dp(18), dp(22), dp(18), dp(22));
-        hero.setBackground(roundBg(0xFF102A43, dp(24)));
-        root.addView(hero, match());
+        // Top navigation bar similar to the original SHAREit home screen.
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.setPadding(dp(16), dp(10), dp(16), dp(10));
+        top.setBackgroundColor(0xFF56339D);
+        root.addView(top, new LinearLayout.LayoutParams(-1, dp(58)));
 
-        TextView logo = new TextView(this);
-        logo.setText("AW");
-        logo.setTextSize(23);
-        logo.setTypeface(null, 1);
-        logo.setTextColor(0xFF102A43);
-        logo.setGravity(Gravity.CENTER);
-        logo.setBackground(roundBg(0xFFFFFFFF, dp(40)));
-        hero.addView(logo, new LinearLayout.LayoutParams(dp(66), dp(66)));
+        TextView menu = new TextView(this);
+        menu.setText("☰");
+        menu.setTextSize(25);
+        menu.setTextColor(Color.WHITE);
+        menu.setGravity(Gravity.CENTER);
+        top.addView(menu, new LinearLayout.LayoutParams(dp(42), -1));
 
         TextView brand = new TextView(this);
         brand.setText("أبو وسام SHARE");
-        brand.setTextSize(27);
-        brand.setTextColor(Color.WHITE);
-        brand.setGravity(Gravity.CENTER);
+        brand.setTextSize(21);
         brand.setTypeface(null, 1);
-        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, -2);
-        bp.topMargin = dp(10);
-        hero.addView(brand, bp);
+        brand.setTextColor(Color.WHITE);
+        LinearLayout.LayoutParams brandP = new LinearLayout.LayoutParams(0, -2, 1);
+        brandP.leftMargin = dp(8);
+        top.addView(brand, brandP);
 
-        TextView intro = new TextView(this);
-        intro.setText("أرسل واستقبل الملفات بين هاتفين بسهولة");
-        intro.setTextSize(15);
-        intro.setTextColor(0xFFD9E7F5);
-        intro.setGravity(Gravity.CENTER);
-        intro.setPadding(0, dp(6), 0, 0);
-        hero.addView(intro);
+        TextView history = new TextView(this);
+        history.setText("◷");
+        history.setTextSize(27);
+        history.setTextColor(Color.WHITE);
+        history.setGravity(Gravity.CENTER);
+        history.setOnClickListener(v -> Toast.makeText(this, "سجل النقل: ستظهر هنا عمليات النقل أثناء الجلسة", Toast.LENGTH_LONG).show());
+        top.addView(history, new LinearLayout.LayoutParams(dp(42), -1));
+
+        // Profile / transfer summary banner.
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.HORIZONTAL);
+        hero.setGravity(Gravity.CENTER_VERTICAL);
+        hero.setPadding(dp(18), dp(18), dp(18), dp(18));
+        hero.setBackground(roundBg(0xFF56339D, dp(0)));
+        root.addView(hero, new LinearLayout.LayoutParams(-1, dp(142)));
+
+        TextView avatar = new TextView(this);
+        avatar.setText("AW");
+        avatar.setTextSize(25);
+        avatar.setTypeface(null, 1);
+        avatar.setTextColor(0xFF56339D);
+        avatar.setGravity(Gravity.CENTER);
+        avatar.setBackground(roundBg(Color.WHITE, dp(50)));
+        hero.addView(avatar, new LinearLayout.LayoutParams(dp(72), dp(72)));
+
+        LinearLayout heroText = new LinearLayout(this);
+        heroText.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams heroTextP = new LinearLayout.LayoutParams(0, -2, 1);
+        heroTextP.leftMargin = dp(14);
+        hero.addView(heroText, heroTextP);
+
+        TextView greeting = new TextView(this);
+        greeting.setText("مرحبًا بك في أبو وسام SHARE");
+        greeting.setTextSize(16);
+        greeting.setTypeface(null, 1);
+        greeting.setTextColor(Color.WHITE);
+        heroText.addView(greeting);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("أرسل الصور والفيديوهات والملفات والتطبيقات");
+        subtitle.setTextSize(12);
+        subtitle.setTextColor(0xFFE8DFFC);
+        subtitle.setPadding(0, dp(6), 0, 0);
+        heroText.addView(subtitle);
+
+        TextView transferNote = new TextView(this);
+        transferNote.setText("نقل محلي عبر Wi-Fi • دون إنترنت");
+        transferNote.setTextSize(12);
+        transferNote.setTextColor(0xFFFFD4B8);
+        transferNote.setPadding(0, dp(8), 0, 0);
+        heroText.addView(transferNote);
 
         TextView section = new TextView(this);
-        section.setText("ماذا تريد أن تفعل؟");
+        section.setText("مشاركة الملفات");
         section.setTextSize(17);
         section.setTypeface(null, 1);
-        section.setTextColor(0xFF102A43);
-        section.setGravity(Gravity.CENTER);
-        section.setPadding(dp(4), dp(18), dp(4), dp(10));
+        section.setTextColor(ink);
+        section.setPadding(dp(20), dp(18), dp(20), dp(8));
         root.addView(section);
 
-        Button send = makeButton("➤   إرسال", 0xFF1769AA);
+        // The two large primary actions are intentionally prominent, like SHAREit's original home.
+        Button send = makeButton("➤   إرسال", purple);
         send.setTextSize(20);
-        root.addView(send, match());
+        send.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams actionP = new LinearLayout.LayoutParams(-1, dp(62));
+        actionP.setMargins(dp(18), dp(2), dp(18), dp(10));
+        root.addView(send, actionP);
         send.setOnClickListener(v -> scanQr());
 
-        Button receive = makeButton("▦   استقبال — اعرض رمزي", 0xFF087F8C);
+        Button receive = makeButton("⬇   استقبال", orange);
         receive.setTextSize(20);
-        root.addView(receive, match());
+        receive.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams receiveP = new LinearLayout.LayoutParams(-1, dp(62));
+        receiveP.setMargins(dp(18), 0, dp(18), dp(14));
+        root.addView(receive, receiveP);
         receive.setOnClickListener(v -> startSharing());
 
+        // Content-type shortcuts, arranged as a classic transfer app category strip.
+        LinearLayout categories = new LinearLayout(this);
+        categories.setOrientation(LinearLayout.HORIZONTAL);
+        categories.setGravity(Gravity.CENTER);
+        categories.setPadding(dp(10), dp(10), dp(10), dp(10));
+        categories.setBackgroundColor(Color.WHITE);
+        root.addView(categories, new LinearLayout.LayoutParams(-1, dp(94)));
+        String[] categoryNames = {"الصور", "الفيديو", "الموسيقى", "التطبيقات", "الملفات"};
+        String[] categoryIcons = {"▧", "▶", "♫", "▣", "▤"};
+        for (int i = 0; i < categoryNames.length; i++) {
+            final String cat = categoryNames[i];
+            LinearLayout item = new LinearLayout(this);
+            item.setOrientation(LinearLayout.VERTICAL);
+            item.setGravity(Gravity.CENTER);
+            categories.addView(item, new LinearLayout.LayoutParams(0, -1, 1));
+            TextView glyph = new TextView(this);
+            glyph.setText(categoryIcons[i]);
+            glyph.setTextSize(24);
+            glyph.setTextColor(i % 2 == 0 ? purple : orange);
+            glyph.setGravity(Gravity.CENTER);
+            item.addView(glyph, new LinearLayout.LayoutParams(-1, dp(36)));
+            TextView label = new TextView(this);
+            label.setText(cat);
+            label.setTextSize(10);
+            label.setTextColor(ink);
+            label.setGravity(Gravity.CENTER);
+            item.addView(label, new LinearLayout.LayoutParams(-1, dp(26)));
+            item.setOnClickListener(v -> {
+                Toast.makeText(this, "اختر الملفات من الهاتف ثم استخدم الإرسال. التصنيف: " + cat, Toast.LENGTH_SHORT).show();
+                chooseFiles();
+            });
+        }
+
+        LinearLayout speedCard = new LinearLayout(this);
+        speedCard.setOrientation(LinearLayout.VERTICAL);
+        speedCard.setPadding(dp(16), dp(12), dp(16), dp(12));
+        speedCard.setBackground(roundBg(Color.WHITE, dp(16)));
+        LinearLayout.LayoutParams speedCardP = new LinearLayout.LayoutParams(-1, -2);
+        speedCardP.setMargins(dp(18), dp(14), dp(18), dp(8));
+        root.addView(speedCard, speedCardP);
+
         TextView speedTitle = new TextView(this);
-        speedTitle.setText("وضع النقل");
-        speedTitle.setTextSize(15);
+        speedTitle.setText("وضع سرعة النقل");
+        speedTitle.setTextSize(14);
         speedTitle.setTypeface(null, 1);
-        speedTitle.setTextColor(0xFF102A43);
-        speedTitle.setPadding(dp(4), dp(12), dp(4), dp(6));
-        root.addView(speedTitle);
+        speedTitle.setTextColor(ink);
+        speedCard.addView(speedTitle);
 
         LinearLayout speeds = new LinearLayout(this);
         speeds.setOrientation(LinearLayout.HORIZONTAL);
-        speeds.setGravity(Gravity.CENTER);
-        root.addView(speeds, match());
-        Button fast = makeButton("⚡ سرعة عالية", 0xFF087F8C);
-        Button normal = makeButton("سرعة عادية", 0xFF627D98);
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, dp(52), 1);
+        speeds.setPadding(0, dp(8), 0, 0);
+        speedCard.addView(speeds, new LinearLayout.LayoutParams(-1, -2));
+        Button fast = makeButton("⚡ سرعة عالية", purple);
+        Button normal = makeButton("سرعة عادية", 0xFF8C879B);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, dp(48), 1);
         sp.setMargins(dp(3), 0, dp(3), 0);
         speeds.addView(fast, sp);
         speeds.addView(normal, sp);
-        fast.setOnClickListener(v -> { highSpeed = true; fast.setBackground(roundBg(0xFF087F8C, dp(14))); normal.setBackground(roundBg(0xFF627D98, dp(14))); Toast.makeText(this, "وضع السرعة العالية؛ الأداء يعتمد على Wi-Fi والهاتفين.", Toast.LENGTH_LONG).show(); });
-        normal.setOnClickListener(v -> { highSpeed = false; normal.setBackground(roundBg(0xFF087F8C, dp(14))); fast.setBackground(roundBg(0xFF627D98, dp(14))); Toast.makeText(this, "اختير وضع السرعة العادية.", Toast.LENGTH_SHORT).show(); });
+        fast.setOnClickListener(v -> { highSpeed = true; fast.setBackground(roundBg(purple, dp(14))); normal.setBackground(roundBg(0xFF8C879B, dp(14))); Toast.makeText(this, "وضع السرعة العالية؛ السرعة الفعلية تعتمد على Wi-Fi والهاتفين.", Toast.LENGTH_LONG).show(); });
+        normal.setOnClickListener(v -> { highSpeed = false; normal.setBackground(roundBg(purple, dp(14))); fast.setBackground(roundBg(0xFF8C879B, dp(14))); Toast.makeText(this, "تم اختيار السرعة العادية.", Toast.LENGTH_SHORT).show(); });
 
-        Button bluetooth = makeButton("ᛒ   مشاركة التطبيق عبر البلوتوث", 0xFF6842A6);
-        root.addView(bluetooth, match());
+        Button bluetooth = makeButton("ᛒ   مشاركة التطبيق عبر البلوتوث", 0xFF3F8F7A);
+        LinearLayout.LayoutParams btP = new LinearLayout.LayoutParams(-1, dp(52));
+        btP.setMargins(dp(18), dp(4), dp(18), dp(8));
+        root.addView(bluetooth, btP);
         bluetooth.setOnClickListener(v -> shareAppApk());
 
         LinearLayout qrCard = new LinearLayout(this);
         qrCard.setOrientation(LinearLayout.VERTICAL);
         qrCard.setGravity(Gravity.CENTER);
-        qrCard.setPadding(dp(14), dp(12), dp(14), dp(12));
+        qrCard.setPadding(dp(16), dp(14), dp(16), dp(14));
         qrCard.setBackground(roundBg(Color.WHITE, dp(18)));
-        LinearLayout.LayoutParams cardParams = match();
-        cardParams.topMargin = dp(8);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
+        cardParams.setMargins(dp(18), dp(4), dp(18), dp(8));
         root.addView(qrCard, cardParams);
 
         TextView qrTitle = new TextView(this);
-        qrTitle.setText("رمز الاتصال");
-        qrTitle.setTextSize(16);
+        qrTitle.setText("رمز الاتصال والاستقبال");
+        qrTitle.setTextSize(15);
         qrTitle.setTypeface(null, 1);
-        qrTitle.setTextColor(0xFF102A43);
+        qrTitle.setTextColor(ink);
         qrCard.addView(qrTitle);
 
         qrView = new ImageView(this);
         qrView.setAdjustViewBounds(true);
         qrView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         qrView.setVisibility(View.GONE);
-        LinearLayout.LayoutParams qrp = new LinearLayout.LayoutParams(dp(240), dp(240));
-        qrp.topMargin = dp(6);
+        LinearLayout.LayoutParams qrp = new LinearLayout.LayoutParams(dp(220), dp(220));
+        qrp.topMargin = dp(8);
         qrCard.addView(qrView, qrp);
 
         status = new TextView(this);
         status.setText("جاهز — اختر إرسالًا أو استقبالًا.");
-        status.setTextSize(14);
-        status.setTextColor(0xFF334E68);
+        status.setTextSize(13);
+        status.setTextColor(0xFF5E5870);
         status.setGravity(Gravity.CENTER);
-        status.setPadding(dp(6), dp(12), dp(6), dp(12));
+        status.setPadding(dp(6), dp(10), dp(6), dp(6));
         qrCard.addView(status, new LinearLayout.LayoutParams(-1, -2));
 
-        Button stop = makeButton("إيقاف المشاركة", 0xFF9B2C2C);
-        root.addView(stop, match());
+        Button stop = makeButton("إيقاف المشاركة", 0xFFB84040);
+        LinearLayout.LayoutParams stopP = new LinearLayout.LayoutParams(-1, dp(48));
+        stopP.setMargins(dp(18), dp(4), dp(18), 0);
+        root.addView(stop, stopP);
         stop.setOnClickListener(v -> stopSharing());
+
+        TextView signature = new TextView(this);
+        signature.setText("تصميم خاص بأبو وسام");
+        signature.setTextSize(11);
+        signature.setTextColor(0xFF8C879B);
+        signature.setGravity(Gravity.CENTER);
+        signature.setPadding(0, dp(12), 0, 0);
+        root.addView(signature, new LinearLayout.LayoutParams(-1, -2));
+
         setContentView(scroll);
     }
 
