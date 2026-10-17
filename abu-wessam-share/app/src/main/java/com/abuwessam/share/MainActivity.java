@@ -441,7 +441,7 @@ public class MainActivity extends Activity {
         @Override public Response serve(IHTTPSession session) {
             String uri = session.getUri();
             if (Method.GET.equals(session.getMethod()) && "/status".equals(uri)) {
-                return newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", "{\\"bytes\\":" + transferBytes + ",\\"total\\":" + transferTotal + ",\\"speed\\":" + (long)transferSpeed + "}");
+                return newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", "{\"bytes\":" + transferBytes + ",\"total\":" + transferTotal + ",\"speed\":" + (long)transferSpeed + "}");
             }
             if (Method.GET.equals(session.getMethod()) && uri.startsWith("/progress")) {
                 try {
