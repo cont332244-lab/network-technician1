@@ -51,6 +51,8 @@ public class MainActivity extends Activity {
     private TextView filesView;
     private ImageView qrView;
     private ShareServer server;
+    private boolean highSpeed = true;
+    private android.webkit.ValueCallback<Uri[]> fileChooserCallback;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -103,26 +105,46 @@ public class MainActivity extends Activity {
         hero.addView(intro);
 
         TextView section = new TextView(this);
-        section.setText("اختر طريقة المشاركة");
+        section.setText("ماذا تريد أن تفعل؟");
         section.setTextSize(17);
         section.setTypeface(null, 1);
         section.setTextColor(0xFF102A43);
-        section.setPadding(dp(4), dp(18), dp(4), dp(8));
+        section.setGravity(Gravity.CENTER);
+        section.setPadding(dp(4), dp(18), dp(4), dp(10));
         root.addView(section);
 
-        Button send = makeButton("📁  اختيار ملفات للإرسال", 0xFF1769AA);
+        Button send = makeButton("➤   إرسال", 0xFF1769AA);
+        send.setTextSize(20);
         root.addView(send, match());
-        send.setOnClickListener(v -> chooseFiles());
+        send.setOnClickListener(v -> scanQr());
 
-        Button start = makeButton("▦  عرض رمز QR للاستقبال", 0xFF087F8C);
-        root.addView(start, match());
-        start.setOnClickListener(v -> startSharing());
-
-        Button receive = makeButton("📷  استقبال — مسح QR", 0xFF4054B2);
+        Button receive = makeButton("▦   استقبال — اعرض رمزي", 0xFF087F8C);
+        receive.setTextSize(20);
         root.addView(receive, match());
-        receive.setOnClickListener(v -> scanQr());
+        receive.setOnClickListener(v -> startSharing());
 
-        Button bluetooth = makeButton("ᛒ  مشاركة التطبيق عبر البلوتوث", 0xFF6842A6);
+        TextView speedTitle = new TextView(this);
+        speedTitle.setText("وضع النقل");
+        speedTitle.setTextSize(15);
+        speedTitle.setTypeface(null, 1);
+        speedTitle.setTextColor(0xFF102A43);
+        speedTitle.setPadding(dp(4), dp(12), dp(4), dp(6));
+        root.addView(speedTitle);
+
+        LinearLayout speeds = new LinearLayout(this);
+        speeds.setOrientation(LinearLayout.HORIZONTAL);
+        speeds.setGravity(Gravity.CENTER);
+        root.addView(speeds, match());
+        Button fast = makeButton("⚡ سرعة عالية", 0xFF087F8C);
+        Button normal = makeButton("سرعة عادية", 0xFF627D98);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, dp(52), 1);
+        sp.setMargins(dp(3), 0, dp(3), 0);
+        speeds.addView(fast, sp);
+        speeds.addView(normal, sp);
+        fast.setOnClickListener(v -> { highSpeed = true; fast.setBackground(roundBg(0xFF087F8C, dp(14))); normal.setBackground(roundBg(0xFF627D98, dp(14))); Toast.makeText(this, "وضع السرعة العالية؛ الأداء يعتمد على Wi-Fi والهاتفين.", Toast.LENGTH_LONG).show(); });
+        normal.setOnClickListener(v -> { highSpeed = false; normal.setBackground(roundBg(0xFF087F8C, dp(14))); fast.setBackground(roundBg(0xFF627D98, dp(14))); Toast.makeText(this, "اختير وضع السرعة العادية.", Toast.LENGTH_SHORT).show(); });
+
+        Button bluetooth = makeButton("ᛒ   مشاركة التطبيق عبر البلوتوث", 0xFF6842A6);
         root.addView(bluetooth, match());
         bluetooth.setOnClickListener(v -> shareAppApk());
 
@@ -188,8 +210,20 @@ public class MainActivity extends Activity {
         Button back = makeButton("رجوع إلى أبو وسام SHARE", 0xFF102A43);
         page.addView(back, match());
         WebView web = new WebView(this);
-        web.getSettings().setJavaScriptEnabled(false);
+        web.getSettings().setJavaScriptEnabled(true);
         web.setWebViewClient(new WebViewClient());
+        web.setWebChromeClient(new android.webkit.WebChromeClient() {
+            @Override public boolean onShowFileChooser(WebView view, android.webkit.ValueCallback<Uri[]> callback, android.webkit.WebChromeClient.FileChooserParams params) {
+                if (fileChooserCallback != null) fileChooserCallback.onReceiveValue(null);
+                fileChooserCallback = callback;
+                Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                pick.addCategory(Intent.CATEGORY_OPENABLE);
+                pick.setType("*/*");
+                try { startActivityForResult(pick, 42); }
+                catch (Exception e) { fileChooserCallback = null; callback.onReceiveValue(null); return false; }
+                return true;
+            }
+        });
         web.setDownloadListener((downloadUrl, userAgent, contentDisposition, mimeType, contentLength) -> {
             try {
                 DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
@@ -249,7 +283,7 @@ public class MainActivity extends Activity {
             File source = new File(getApplicationInfo().sourceDir);
             File copy = new File(getCacheDir(), "Abu-Wessam-SHARE.apk");
             try (InputStream in = new FileInputStream(source); FileOutputStream out = new FileOutputStream(copy)) {
-                byte[] buffer = new byte[32768]; int count;
+                byte[] buffer = new byte[highSpeed ? 262144 : 32768]; int count;
                 while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
             }
             Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", copy);
@@ -289,6 +323,14 @@ public class MainActivity extends Activity {
                 catch (Exception e) { status.setText("تعذّر فتح صفحة المشاركة داخل التطبيق."); }
             } else if (scanned != null) {
                 Toast.makeText(this, "رمز غير صالح. امسح رمز أبو وسام SHARE.", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+        if (requestCode == 42) {
+            if (fileChooserCallback != null) {
+                Uri[] result = (resultCode == RESULT_OK && data != null && data.getData() != null) ? new Uri[]{data.getData()} : null;
+                fileChooserCallback.onReceiveValue(result);
+                fileChooserCallback = null;
             }
             return;
         }
@@ -334,7 +376,7 @@ public class MainActivity extends Activity {
             }
             String ip = getLocalIp();
             if (ip == null) ip = "تعذّر تحديد IP؛ تأكد من اتصال Wi‑Fi";
-            status.setText("جاهز للإرسال! امسح الرمز من الهاتف الآخر.\nhttp://" + ip + ":8765");
+            status.setText("جاهز للاستقبال — دع الهاتف الآخر يضغط إرسال ويمسح الرمز.\nhttp://" + ip + ":8765\nالوضع: " + (highSpeed ? "سرعة عالية" : "سرعة عادية"));
             showQr("http://" + ip + ":8765");
             Toast.makeText(this, "بدأت المشاركة على المنفذ 8765", Toast.LENGTH_LONG).show();
         } catch (Exception e) {
