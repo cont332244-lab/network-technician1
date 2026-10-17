@@ -2,17 +2,16 @@ package com.abuwessam.vpn;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.os.StrictMode;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.view.Gravity;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.*;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+
+import androidx.core.content.FileProvider;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -21,18 +20,17 @@ import java.util.*;
 
 public class MainActivity extends Activity {
     private final int navy = Color.rgb(11, 22, 44);
-    private final int teal = Color.rgb(0, 190, 170);
+    private final int teal = Color.rgb(0, 150, 140);
     private LinearLayout list;
     private TextView status;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ArrayList<Server> servers = new ArrayList<>();
 
     static class Server {
-        String host, ip, country, countryCode, ping, speed, config;
+        String ip, country, countryCode, ping, speed, config;
         Server(String[] c) {
-            host = val(c,0); ip = val(c,1); ping = val(c,3);
-            speed = val(c,4); country = val(c,5); countryCode = val(c,6);
-            config = val(c,14);
+            ip = val(c,1); ping = val(c,3); speed = val(c,4);
+            country = val(c,5); countryCode = val(c,6); config = val(c,14);
         }
         static String val(String[] a, int i) { return i < a.length ? a[i] : ""; }
         String speedText() {
@@ -45,7 +43,6 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         getWindow().setStatusBarColor(navy);
         getWindow().setNavigationBarColor(navy);
-        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder().permitAll().build());
         buildUi();
         loadServers();
     }
@@ -72,8 +69,7 @@ public class MainActivity extends Activity {
         brand.setBackgroundColor(navy);
         root.addView(brand, new LinearLayout.LayoutParams(-1, 105));
 
-        TextView subtitle = text("سيرفرات عامة مجانية • تتغير حسب التوفر", 14, Color.DKGRAY, false);
-        root.addView(subtitle);
+        root.addView(text("سيرفرات عامة مجانية • تتغير حسب التوفر", 14, Color.DKGRAY, false));
 
         Button refresh = new Button(this);
         refresh.setText("تحديث قائمة السيرفرات");
@@ -85,15 +81,14 @@ public class MainActivity extends Activity {
         status = text("جارٍ تحميل السيرفرات…", 14, navy, true);
         root.addView(status);
 
-        TextView warning = text("تنبيه: هذه نسخة أولية تعرض السيرفرات وتتيح تصدير ملف الإعداد. الاتصال الفعلي يتم عبر عميل OpenVPN متوافق بعد استيراد الملف، وليس داخل التطبيق بعد.", 13, Color.rgb(110,70,0), false);
+        TextView warning = text("هذه النسخة تعرض السيرفرات وتصدر ملف الإعداد فقط. لاستعمال الاتصال، افتح الملف في تطبيق OpenVPN متوافق. الاتصال غير مدمج داخل التطبيق في هذه النسخة.", 13, Color.rgb(110,70,0), false);
         warning.setBackgroundColor(Color.rgb(255,243,205));
         root.addView(warning);
 
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         root.addView(list);
-        TextView footer = text("المصدر: VPN Gate العام. السيرفرات تطوعية وقد تكون بطيئة أو غير آمنة للاستخدام الحساس.", 12, Color.GRAY, false);
-        root.addView(footer);
+        root.addView(text("المصدر: VPN Gate العام. السيرفرات تطوعية وقد تكون بطيئة أو غير مناسبة للبيانات الحساسة.", 12, Color.GRAY, false));
     }
 
     private void loadServers() {
@@ -102,9 +97,9 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             ArrayList<Server> found = new ArrayList<>();
             HttpURLConnection conn = null;
+            String error = null;
             try {
-                URL url = new URL("https://www.vpngate.net/api/iphone/");
-                conn = (HttpURLConnection) url.openConnection();
+                conn = (HttpURLConnection) new URL("https://www.vpngate.net/api/iphone/").openConnection();
                 conn.setConnectTimeout(12000);
                 conn.setReadTimeout(15000);
                 conn.setRequestProperty("User-Agent", "AbuWessamVPN/1.0");
@@ -114,29 +109,24 @@ public class MainActivity extends Activity {
                     if (line.startsWith("*")) continue;
                     if (!headerSeen) { headerSeen = true; continue; }
                     String[] cols = parseCsv(line);
-                    if (cols.length >= 15 && !cols[14].isEmpty()) {
+                    if (cols.length >= 15 && !cols[14].trim().isEmpty()) {
                         Server s = new Server(cols);
                         if (!s.ip.isEmpty() && !s.config.isEmpty()) found.add(s);
                     }
                 }
                 br.close();
-                Collections.sort(found, (a,b) -> {
-                    long sa = parseLong(a.speed), sb = parseLong(b.speed);
-                    return Long.compare(sb, sa);
-                });
+                Collections.sort(found, (a,b) -> Long.compare(parseLong(b.speed), parseLong(a.speed)));
             } catch (Exception e) {
-                String msg = e.getMessage() == null ? "تعذر الوصول إلى المصدر" : e.getMessage();
-                handler.post(() -> status.setText("تعذر تحميل السيرفرات: " + msg));
+                error = e.getMessage() == null ? "تعذر الوصول إلى المصدر" : e.getMessage();
             } finally { if (conn != null) conn.disconnect(); }
+            final String err = error;
             handler.post(() -> {
                 servers.clear(); servers.addAll(found);
                 if (!found.isEmpty()) {
                     status.setText("السيرفرات المتاحة الآن: " + found.size() + " — مرتبة حسب السرعة المعلنة");
                     showServers();
-                } else if (status.getText().toString().startsWith("تعذر")) {
-                    // Preserve the connection error message.
                 } else {
-                    status.setText("لم تصل قائمة سيرفرات. اضغط تحديث وحاول لاحقًا.");
+                    status.setText(err != null ? "تعذر تحميل السيرفرات: " + err : "لم تصل قائمة سيرفرات. اضغط تحديث وحاول لاحقًا.");
                 }
             });
         }).start();
@@ -176,13 +166,11 @@ public class MainActivity extends Activity {
             cp.setMargins(0, 8, 0, 8);
             list.addView(card, cp);
 
-            TextView title = text("🌐 " + s.country + " (" + s.countryCode + ")", 18, navy, true);
-            card.addView(title);
-            TextView details = text("IP: " + s.ip + "\nPing: " + (s.ping.isEmpty() ? "غير معروف" : s.ping + " ms") + "   •   السرعة المعلنة: " + s.speedText(), 13, Color.DKGRAY, false);
-            card.addView(details);
+            card.addView(text("🌐 " + s.country + " (" + s.countryCode + ")", 18, navy, true));
+            card.addView(text("IP: " + s.ip + "\nPing: " + (s.ping.isEmpty() ? "غير معروف" : s.ping + " ms") + "   •   السرعة المعلنة: " + s.speedText(), 13, Color.DKGRAY, false));
 
             Button export = new Button(this);
-            export.setText("تصدير إعداد OpenVPN لهذا السيرفر");
+            export.setText("مشاركة ملف إعداد OpenVPN");
             card.addView(export);
             export.setOnClickListener(v -> exportConfig(s));
         }
@@ -191,20 +179,20 @@ public class MainActivity extends Activity {
     private void exportConfig(Server s) {
         try {
             byte[] decoded = android.util.Base64.decode(s.config, android.util.Base64.DEFAULT);
-            File file = new File(getExternalFilesDir(null), "AbuWessam-" + s.countryCode + "-" + s.ip.replace(".","_") + ".ovpn");
-            FileOutputStream fos = new FileOutputStream(file);
-            fos.write(decoded); fos.close();
+            File dir = getExternalFilesDir(null);
+            if (dir == null) throw new IOException("مساحة التخزين غير متاحة");
+            File file = new File(dir, "AbuWessam-" + s.countryCode + "-" + s.ip.replace(".","_") + ".ovpn");
+            try (FileOutputStream fos = new FileOutputStream(file)) { fos.write(decoded); }
 
-            Uri uri = Uri.fromFile(file);
+            Uri uri = FileProvider.getUriForFile(this, "com.abuwessam.vpn.fileprovider", file);
             Intent share = new Intent(Intent.ACTION_SEND);
             share.setType("application/x-openvpn-profile");
             share.putExtra(Intent.EXTRA_SUBJECT, "Abu Wessam VPN - " + s.country);
             share.putExtra(Intent.EXTRA_TEXT, "ملف إعداد OpenVPN لسيرفر عام مجاني. استورده في تطبيق OpenVPN متوافق.");
             share.putExtra(Intent.EXTRA_STREAM, uri);
+            share.setClipData(android.content.ClipData.newUri(getContentResolver(), "OpenVPN profile", uri));
             share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            // File URI access is not supported by many receiving apps; use a content URI through chooser fallback.
-            Intent chooser = Intent.createChooser(share, "افتح أو أرسل ملف إعداد VPN");
-            startActivity(chooser);
+            startActivity(Intent.createChooser(share, "افتح أو أرسل ملف إعداد VPN"));
         } catch (Exception e) {
             Toast.makeText(this, "تعذر تجهيز ملف السيرفر: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
