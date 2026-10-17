@@ -11,6 +11,11 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ImageView;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.qrcode.QRCodeWriter;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -38,6 +43,7 @@ public class MainActivity extends Activity {
     private final List<String> selectedNames = Collections.synchronizedList(new ArrayList<String>());
     private TextView status;
     private TextView filesView;
+    private ImageView qrView;
     private ShareServer server;
 
     @Override public void onCreate(Bundle state) {
@@ -50,64 +56,94 @@ public class MainActivity extends Activity {
     private void buildUi() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(22), dp(20), dp(20));
-        root.setBackgroundColor(0xFFF3F6FA);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setPadding(dp(18), dp(20), dp(18), dp(16));
+        root.setBackgroundColor(0xFFF2F6FA);
 
         TextView brand = new TextView(this);
         brand.setText("أبو وسام SHARE");
-        brand.setTextSize(28);
+        brand.setTextSize(29);
         brand.setTextColor(0xFF102A43);
         brand.setGravity(Gravity.CENTER);
-        brand.setPadding(0, dp(12), 0, dp(6));
         brand.setTypeface(null, 1);
         root.addView(brand, new LinearLayout.LayoutParams(-1, -2));
 
         TextView intro = new TextView(this);
-        intro.setText("مشاركة الملفات بين الهواتف على شبكة Wi‑Fi واحدة، دون إنترنت.");
+        intro.setText("أرسل واستقبل ملفاتك بسهولة");
         intro.setTextSize(16);
         intro.setTextColor(0xFF486581);
         intro.setGravity(Gravity.CENTER);
-        intro.setPadding(dp(8), dp(4), dp(8), dp(18));
+        intro.setPadding(0, dp(8), 0, dp(14));
         root.addView(intro);
 
-        Button pick = new Button(this);
-        pick.setText("١. اختر ملفات للإرسال");
-        root.addView(pick, match());
-        pick.setOnClickListener(v -> chooseFiles());
+        Button send = new Button(this);
+        send.setText("إرسال ملفات");
+        root.addView(send, match());
+        send.setOnClickListener(v -> chooseFiles());
+
+        Button start = new Button(this);
+        start.setText("إنشاء رمز QR للمشاركة");
+        root.addView(start, match());
+        start.setOnClickListener(v -> startSharing());
+
+        Button receive = new Button(this);
+        receive.setText("استقبال — تصوير رمز QR");
+        root.addView(receive, match());
+        receive.setOnClickListener(v -> scanQr());
+
+        qrView = new ImageView(this);
+        qrView.setAdjustViewBounds(true);
+        qrView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams qrp = new LinearLayout.LayoutParams(dp(220), dp(220));
+        qrp.topMargin = dp(8);
+        root.addView(qrView, qrp);
+
+        status = new TextView(this);
+        status.setText("اختر إرسال أو استقبال للبدء.");
+        status.setTextSize(15);
+        status.setTextColor(0xFF102A43);
+        status.setGravity(Gravity.CENTER);
+        status.setPadding(dp(4), dp(8), dp(4), dp(8));
+        root.addView(status, new LinearLayout.LayoutParams(-1, -2));
 
         filesView = new TextView(this);
         filesView.setText("لم تختر ملفات بعد.");
         filesView.setTextSize(14);
         filesView.setTextColor(0xFF334E68);
-        filesView.setPadding(dp(8), dp(12), dp(8), dp(12));
-        root.addView(filesView);
-
-        Button start = new Button(this);
-        start.setText("٢. ابدأ المشاركة");
-        root.addView(start, match());
-        start.setOnClickListener(v -> startSharing());
+        filesView.setPadding(dp(8), dp(6), dp(8), dp(6));
+        root.addView(filesView, new LinearLayout.LayoutParams(-1, 0, 1));
 
         Button stop = new Button(this);
         stop.setText("إيقاف المشاركة");
         root.addView(stop, match());
         stop.setOnClickListener(v -> stopSharing());
-
-        status = new TextView(this);
-        status.setText("الحالة: متوقف");
-        status.setTextSize(16);
-        status.setTextColor(0xFF102A43);
-        status.setPadding(dp(8), dp(18), dp(8), dp(8));
-        root.addView(status);
-
-        TextView instructions = new TextView(this);
-        instructions.setText("طريقة الاستخدام:\n• صِل الهاتفين بشبكة Wi‑Fi نفسها، أو فعّل نقطة اتصال من أحدهما وصِل الآخر بها.\n• اضغط «ابدأ المشاركة» ثم افتح العنوان الظاهر على الهاتف الثاني في المتصفح.\n• يمكن تنزيل الملفات المختارة أو رفع ملفات إلى الهاتف المضيف.\n• أبقِ التطبيق مفتوحًا أثناء النقل، وأوقف المشاركة عند الانتهاء.");
-        instructions.setTextColor(0xFF486581);
-        instructions.setTextSize(14);
-        instructions.setPadding(dp(8), dp(10), dp(8), dp(10));
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(instructions);
-        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
+    }
+
+    private void scanQr() {
+        com.google.zxing.integration.android.IntentIntegrator integrator =
+            new com.google.zxing.integration.android.IntentIntegrator(this);
+        integrator.setDesiredBarcodeFormats(com.google.zxing.integration.android.IntentIntegrator.QR_CODE);
+        integrator.setPrompt("صوّر رمز QR الموجود على هاتف المُرسِل");
+        integrator.setBeepEnabled(false);
+        integrator.setOrientationLocked(false);
+        integrator.initiateScan();
+    }
+
+    private void showQr(String text) {
+        try {
+            com.google.zxing.common.BitMatrix matrix = new QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 600, 600);
+            Bitmap bitmap = Bitmap.createBitmap(600, 600, Bitmap.Config.RGB_565);
+            for (int x = 0; x < 600; x++) {
+                for (int y = 0; y < 600; y++) {
+                    bitmap.setPixel(x, y, matrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                }
+            }
+            qrView.setImageBitmap(bitmap);
+            qrView.setVisibility(View.VISIBLE);
+        } catch (Exception e) {
+            status.setText("تعذّر إنشاء رمز QR.");
+        }
     }
 
     private LinearLayout.LayoutParams match() {
@@ -127,6 +163,18 @@ public class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        com.google.zxing.integration.android.IntentResult scanResult =
+            com.google.zxing.integration.android.IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (scanResult != null) {
+            String scanned = scanResult.getContents();
+            if (scanned != null && (scanned.startsWith("http://") || scanned.startsWith("https://"))) {
+                try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(scanned))); }
+                catch (Exception e) { status.setText("تعذّر فتح رابط المشاركة."); }
+            } else if (scanned != null) {
+                Toast.makeText(this, "رمز غير صالح. امسح رمز أبو وسام SHARE.", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
         if (requestCode != PICK_FILES || resultCode != RESULT_OK || data == null) return;
         if (data.getClipData() != null) {
             for (int n = 0; n < data.getClipData().getItemCount(); n++) addUri(data.getClipData().getItemAt(n).getUri());
