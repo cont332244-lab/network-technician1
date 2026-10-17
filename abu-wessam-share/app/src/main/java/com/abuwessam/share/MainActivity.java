@@ -97,7 +97,7 @@ public class MainActivity extends Activity {
         hero.addView(brand, bp);
 
         TextView intro = new TextView(this);
-        intro.setText("مشاركة ملفاتك بسرعة وبسهولة");
+        intro.setText("أرسل واستقبل الملفات بين هاتفين بسهولة");
         intro.setTextSize(15);
         intro.setTextColor(0xFFD9E7F5);
         intro.setGravity(Gravity.CENTER);
@@ -179,13 +179,6 @@ public class MainActivity extends Activity {
         status.setGravity(Gravity.CENTER);
         status.setPadding(dp(6), dp(12), dp(6), dp(12));
         qrCard.addView(status, new LinearLayout.LayoutParams(-1, -2));
-
-        filesView = new TextView(this);
-        filesView.setText("لم تختر ملفات بعد.");
-        filesView.setTextSize(14);
-        filesView.setTextColor(0xFF334E68);
-        filesView.setPadding(dp(8), dp(8), dp(8), dp(8));
-        root.addView(filesView, new LinearLayout.LayoutParams(-1, -2));
 
         Button stop = makeButton("إيقاف المشاركة", 0xFF9B2C2C);
         root.addView(stop, match());
