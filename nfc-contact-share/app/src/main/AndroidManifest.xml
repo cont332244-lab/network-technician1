@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
  <uses-permission android:name="android.permission.NFC"/>
  <uses-feature android:name="android.hardware.nfc" android:required="false"/>
- <application android:theme="@android:style/Theme.Material.Light.NoActionBar" android:label="رقمي عبر NFC - أبو وسام" android:allowBackup="false" android:supportsRtl="true">
+ <application android:theme="@android:style/Theme.Material.Light.NoActionBar" android:label="رقمي عبر NFC - أبو وسام" android:icon="@drawable/ic_launcher_nfc" android:roundIcon="@drawable/ic_launcher_nfc" android:allowBackup="false" android:supportsRtl="true">
   <provider android:name="androidx.core.content.FileProvider" android:authorities="com.abuwessam.nfccontact.fileprovider" android:exported="false" android:grantUriPermissions="true">
    <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths"/>
   </provider>
