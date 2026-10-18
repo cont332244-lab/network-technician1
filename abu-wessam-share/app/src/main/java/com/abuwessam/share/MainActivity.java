@@ -33,6 +33,9 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.InetAddress;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -52,6 +55,9 @@ public class MainActivity extends Activity {
     private ImageView qrView;
     private ShareServer server;
     private boolean highSpeed = true;
+    private volatile boolean discoveryRunning = false;
+    private Thread discoveryThread;
+    private final android.os.Handler uiHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private android.webkit.ValueCallback<Uri[]> fileChooserCallback;
     private final android.os.Handler speedHandler = new android.os.Handler();
     private final Runnable speedTicker = new Runnable() {
@@ -183,7 +189,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams actionP = new LinearLayout.LayoutParams(-1, dp(62));
         actionP.setMargins(dp(18), dp(2), dp(18), dp(10));
         root.addView(send, actionP);
-        send.setOnClickListener(v -> scanQr());
+        send.setOnClickListener(v -> showDeviceDiscovery());
 
         Button receive = makeButton("⬇   استقبال", orange);
         receive.setTextSize(20);
@@ -310,13 +316,115 @@ public class MainActivity extends Activity {
     }
 
     private void scanQr() {
-        com.google.zxing.integration.android.IntentIntegrator integrator =
-            new com.google.zxing.integration.android.IntentIntegrator(this);
+        com.google.zxing.integration.android.IntentIntegrator integrator = new com.google.zxing.integration.android.IntentIntegrator(this);
         integrator.setDesiredBarcodeFormats(com.google.zxing.integration.android.IntentIntegrator.QR_CODE);
-        integrator.setPrompt("صوّر رمز QR الموجود على هاتف المُرسِل");
+        integrator.setPrompt("امسح رمز الاستقبال إذا لم يظهر الجهاز");
         integrator.setBeepEnabled(false);
         integrator.setOrientationLocked(false);
         integrator.initiateScan();
+    }
+
+    private void showDeviceDiscovery() {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(18), dp(18), dp(18), dp(18));
+        page.setBackgroundColor(0xFFF6F3FC);
+        Button back = makeButton("رجوع", 0xFF56339D);
+        page.addView(back, new LinearLayout.LayoutParams(-1, dp(48)));
+        TextView title = new TextView(this);
+        title.setText("البحث عن أجهزة الاستقبال");
+        title.setTextColor(0xFF24213A); title.setTextSize(22); title.setTypeface(null, 1); title.setGravity(Gravity.CENTER);
+        title.setPadding(0, dp(18), 0, dp(8)); page.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        TextView hint = new TextView(this);
+        hint.setText("افتح «استقبال» في الهاتف الآخر، واجعل الهاتفين على شبكة Wi-Fi نفسها.");
+        hint.setTextColor(0xFF6B647C); hint.setTextSize(14); hint.setGravity(Gravity.CENTER);
+        page.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+        TextView scanning = new TextView(this);
+        scanning.setText("◉  جارٍ البحث عن الأجهزة القريبة…"); scanning.setTextSize(16); scanning.setTextColor(0xFF6C42C1);
+        scanning.setGravity(Gravity.CENTER); scanning.setPadding(0, dp(20), 0, dp(16));
+        page.addView(scanning, new LinearLayout.LayoutParams(-1, -2));
+        android.widget.ProgressBar spinner = new android.widget.ProgressBar(this);
+        spinner.setIndeterminate(true); LinearLayout.LayoutParams spinP = new LinearLayout.LayoutParams(dp(44), dp(44)); spinP.gravity = Gravity.CENTER;
+        page.addView(spinner, spinP);
+        LinearLayout devices = new LinearLayout(this); devices.setOrientation(LinearLayout.VERTICAL);
+        page.addView(devices, new LinearLayout.LayoutParams(-1, 0, 1));
+        Button qr = makeButton("الاتصال عبر رمز QR بدل البحث", 0xFFFF8A3D);
+        page.addView(qr, new LinearLayout.LayoutParams(-1, dp(52)));
+        qr.setOnClickListener(v -> scanQr()); back.setOnClickListener(v -> buildUi()); setContentView(page);
+        final java.util.Set<String> found = java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
+        final long started = System.currentTimeMillis();
+        final Runnable updateHint = new Runnable() {
+            @Override public void run() {
+                if (isFinishing()) return;
+                if (found.isEmpty() && System.currentTimeMillis() - started < 9000) {
+                    scanning.setText("◉  جارٍ البحث عن أجهزة الاستقبال…"); uiHandler.postDelayed(this, 700);
+                } else if (found.isEmpty()) {
+                    spinner.setVisibility(View.GONE);
+                    scanning.setText("لم نعثر على جهاز. افتح «استقبال» في الهاتف الآخر وتأكد من اتصال الهاتفين بالشبكة نفسها.");
+                    scanning.setTextColor(0xFFB84040);
+                }
+            }
+        };
+        uiHandler.postDelayed(updateHint, 700);
+        new Thread(() -> {
+            long until = System.currentTimeMillis() + 9000;
+            while (System.currentTimeMillis() < until) {
+                try (DatagramSocket socket = new DatagramSocket()) {
+                    socket.setBroadcast(true); socket.setSoTimeout(650);
+                    byte[] request = "ABUWESSAM_DISCOVER_V1".getBytes("UTF-8");
+                    socket.send(new DatagramPacket(request, request.length, java.net.InetAddress.getByName("255.255.255.255"), 8766));
+                    long waitUntil = System.currentTimeMillis() + 800;
+                    while (System.currentTimeMillis() < waitUntil) {
+                        try {
+                            byte[] buf = new byte[1024]; DatagramPacket reply = new DatagramPacket(buf, buf.length); socket.receive(reply);
+                            String response = new String(reply.getData(), 0, reply.getLength(), "UTF-8");
+                            if (response.startsWith("ABUWESSAM_DEVICE_V1|")) {
+                                String[] parts = response.split("\\|", 3);
+                                if (parts.length == 3 && found.add(parts[2])) {
+                                    final String deviceName = parts[1], url = parts[2];
+                                    uiHandler.post(() -> {
+                                        spinner.setVisibility(View.GONE); scanning.setText("تم العثور على جهاز استقبال"); scanning.setTextColor(0xFF23865A);
+                                        Button device = makeButton("📱  " + deviceName + "\nاضغط للاتصال", 0xFF6C42C1);
+                                        LinearLayout.LayoutParams rowP = new LinearLayout.LayoutParams(-1, dp(76)); rowP.bottomMargin = dp(8);
+                                        devices.addView(device, rowP); device.setOnClickListener(v -> openScannedPage(url));
+                                    });
+                                }
+                            }
+                        } catch (java.net.SocketTimeoutException timeout) { break; }
+                    }
+                } catch (Exception ignored) { }
+                try { Thread.sleep(350); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); break; }
+            }
+        }, "AbuWessamDeviceScan").start();
+    }
+
+    private void startDiscoveryResponder() {
+        if (discoveryRunning) return;
+        discoveryRunning = true;
+        discoveryThread = new Thread(() -> {
+            try (DatagramSocket socket = new DatagramSocket(null)) {
+                socket.setReuseAddress(true); socket.bind(new InetSocketAddress(8766)); socket.setBroadcast(true);
+                byte[] buffer = new byte[1024];
+                while (discoveryRunning) {
+                    try {
+                        DatagramPacket request = new DatagramPacket(buffer, buffer.length); socket.receive(request);
+                        String message = new String(request.getData(), request.getOffset(), request.getLength(), "UTF-8");
+                        if ("ABUWESSAM_DISCOVER_V1".equals(message)) {
+                            String ip = getLocalIp(); if (ip == null) ip = request.getAddress().getHostAddress();
+                            byte[] reply = ("ABUWESSAM_DEVICE_V1|أبو وسام SHARE|http://" + ip + ":8765").getBytes("UTF-8");
+                            socket.send(new DatagramPacket(reply, reply.length, request.getAddress(), request.getPort()));
+                        }
+                    } catch (Exception ignored) { }
+                }
+            } catch (Exception ignored) { }
+        }, "AbuWessamDiscoveryResponder");
+        discoveryThread.setDaemon(true); discoveryThread.start();
+    }
+
+    private void stopDiscoveryResponder() {
+        discoveryRunning = false;
+        if (discoveryThread != null) discoveryThread.interrupt();
+        discoveryThread = null;
     }
 
     private void openScannedPage(String url) {
@@ -494,6 +602,7 @@ public class MainActivity extends Activity {
             if (ip == null) ip = "تعذّر تحديد IP؛ تأكد من اتصال Wi‑Fi";
             status.setText("جاهز للاستقبال — دع الهاتف الآخر يضغط إرسال ويمسح الرمز.\nhttp://" + ip + ":8765\nالوضع: " + (highSpeed ? "سرعة عالية" : "سرعة عادية"));
             showQr("http://" + ip + ":8765");
+            startDiscoveryResponder();
             speedHandler.removeCallbacks(speedTicker);
             speedHandler.post(speedTicker);
             Toast.makeText(this, "بدأت المشاركة على المنفذ 8765", Toast.LENGTH_LONG).show();
@@ -504,6 +613,7 @@ public class MainActivity extends Activity {
     }
 
     private void stopSharing() {
+        stopDiscoveryResponder();
         if (server != null) { server.stop(); server = null; }
         speedHandler.removeCallbacks(speedTicker);
         status.setText("الحالة: متوقف");
@@ -601,12 +711,12 @@ public class MainActivity extends Activity {
         }
 
         private Response htmlPage() {
-            StringBuilder h = new StringBuilder("<!doctype html><html lang='ar' dir='rtl'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>أبو وسام SHARE</title><body style='font-family:sans-serif;max-width:760px;margin:24px auto;padding:0 16px;background:#f3f6fa;color:#102a43'><h1>أبو وسام SHARE</h1><section style='background:white;border-radius:16px;padding:14px;margin:12px 0'><b>سرعة النقل</b><p id='rate'>0 KB/s</p><div style='height:12px;background:#d9e2ec;border-radius:10px;overflow:hidden'><div id='bar' style='height:100%;width:0%;background:#087f8c'></div></div><p id='pct'>0%</p></section><h2>تنزيل الملفات</h2><ul>");
+            StringBuilder h = new StringBuilder("<!doctype html><html lang='ar' dir='rtl'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>أبو وسام SHARE</title><body style='font-family:sans-serif;max-width:760px;margin:24px auto;padding:0 16px;background:#f3f6fa;color:#102a43'><h1>أبو وسام SHARE</h1><section style='background:white;border-radius:16px;padding:14px;margin:12px 0'><b>سرعة النقل</b><p id='rate'>0 KB/s</p><div style='height:28px;background:#e5ddf6;border-radius:18px;overflow:hidden;border:1px solid #d0c2ed'><div id='bar' style='height:100%;width:0%;background:linear-gradient(90deg,#6c42c1,#ff8a3d);border-radius:18px;transition:width .18s'></div></div><p id='pct'>0%</p></section><h2>تنزيل الملفات</h2><ul>");
             synchronized (selectedNames) {
                 for (int i=0; i<selectedNames.size(); i++) h.append("<li style='margin:12px 0'><a href='/file/").append(i).append("'>").append(escape(selectedNames.get(i))).append("</a></li>");
             }
             if (selectedNames.isEmpty()) h.append("<li>لم يحدد المضيف ملفات للإرسال.</li>");
-            h.append("</ul><hr><h2>إرسال ملف إلى هذا الهاتف</h2><input id='file' type='file' required><p><button onclick='sendFile()'>رفع الملف</button></p><p id='msg'>اختر ملفًا لبدء الإرسال.</p><script>function human(n){if(n>=1048576)return (n/1048576).toFixed(2)+' MB/s';if(n>=1024)return (n/1024).toFixed(1)+' KB/s';return Math.round(n)+' B/s'}function sendFile(){let f=document.getElementById('file').files[0];if(!f)return;let x=new XMLHttpRequest(),t=Date.now();x.open('POST','/upload');x.upload.onprogress=e=>{if(e.lengthComputable){let s=e.loaded/Math.max(.001,(Date.now()-t)/1000);document.getElementById('rate').textContent=human(s);document.getElementById('bar').style.width=(e.loaded/e.total*100)+'%';document.getElementById('pct').textContent=Math.floor(e.loaded/e.total*100)+'%';document.getElementById('msg').textContent='جارٍ الإرسال: '+human(s);fetch('/progress?bytes='+e.loaded+'&total='+e.total+'&speed='+s).catch(()=>{});}};x.onload=()=>document.getElementById('msg').textContent=x.status===200?'اكتمل الإرسال':'تعذّر الإرسال';x.onerror=()=>document.getElementById('msg').textContent='انقطع الاتصال';let d=new FormData();d.append('file',f,f.name);x.send(d)}function poll(){fetch('/status').then(r=>r.json()).then(s=>{if(s.total>0){document.getElementById('rate').textContent=human(s.speed);document.getElementById('bar').style.width=Math.min(100,s.bytes*100/s.total)+'%';document.getElementById('pct').textContent=Math.floor(Math.min(100,s.bytes*100/s.total))+'%';}}).catch(()=>{});setTimeout(poll,500)}poll();</script><p>اترك تطبيق أبو وسام SHARE مفتوحًا على الهاتف المضيف أثناء النقل.</p></body></html>");
+            h.append("</ul><hr><h2>إرسال ملف إلى هذا الهاتف</h2><label for='file' style='display:block;background:#f1ebfc;border:2px dashed #8b6ad0;border-radius:18px;padding:26px 14px;text-align:center;color:#56339d;font-weight:bold;cursor:pointer'>＋<br>اضغط هنا لاختيار ملف من هاتفك<br><small style='font-weight:normal;color:#6b647c'>صور، فيديو، مستندات وملفات</small></label><input id='file' type='file' required style='display:none'><p><button style='width:100%;border:0;border-radius:14px;background:#6c42c1;color:white;padding:15px;font-size:17px;font-weight:bold' onclick='sendFile()'>إرسال الملف</button></p><p id='msg'>اختر ملفًا لبدء الإرسال.</p><script>function human(n){if(n>=1048576)return (n/1048576).toFixed(2)+' MB/s';if(n>=1024)return (n/1024).toFixed(1)+' KB/s';return Math.round(n)+' B/s'}function sendFile(){let f=document.getElementById('file').files[0];if(!f)return;let x=new XMLHttpRequest(),t=Date.now();x.open('POST','/upload');x.upload.onprogress=e=>{if(e.lengthComputable){let s=e.loaded/Math.max(.001,(Date.now()-t)/1000);document.getElementById('rate').textContent=human(s);document.getElementById('bar').style.width=(e.loaded/e.total*100)+'%';document.getElementById('pct').textContent=Math.floor(e.loaded/e.total*100)+'%';document.getElementById('msg').textContent='جارٍ الإرسال: '+human(s);fetch('/progress?bytes='+e.loaded+'&total='+e.total+'&speed='+s).catch(()=>{});}};x.onload=()=>document.getElementById('msg').textContent=x.status===200?'اكتمل الإرسال':'تعذّر الإرسال';x.onerror=()=>document.getElementById('msg').textContent='انقطع الاتصال';let d=new FormData();d.append('file',f,f.name);x.send(d)}function poll(){fetch('/status').then(r=>r.json()).then(s=>{if(s.total>0){document.getElementById('rate').textContent=human(s.speed);document.getElementById('bar').style.width=Math.min(100,s.bytes*100/s.total)+'%';document.getElementById('pct').textContent=Math.floor(Math.min(100,s.bytes*100/s.total))+'%';}}).catch(()=>{});setTimeout(poll,500)}poll();</script><p>اترك تطبيق أبو وسام SHARE مفتوحًا على الهاتف المضيف أثناء النقل.</p></body></html>");
             return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", h.toString());
         }
 
