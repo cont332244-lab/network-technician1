@@ -2,6 +2,9 @@ plugins { id 'com.android.application' }
 android {
  namespace 'com.abuwessam.nfccontact'
  compileSdk 35
- defaultConfig { applicationId 'com.abuwessam.nfccontact'; minSdk 23; targetSdk 28; versionCode 2; versionName '1.1' }
+ defaultConfig { applicationId 'com.abuwessam.nfccontact'; minSdk 23; targetSdk 28; versionCode 3; versionName '1.2' }
 }
-dependencies { implementation 'com.google.zxing:core:3.5.3' }
+dependencies {
+ implementation 'com.google.zxing:core:3.5.3'
+ implementation 'androidx.core:core:1.15.0'
+}
