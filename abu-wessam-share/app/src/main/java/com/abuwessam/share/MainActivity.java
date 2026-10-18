@@ -7,6 +7,11 @@ import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
+import android.provider.MediaStore;
+import android.content.ContentValues;
+import android.content.ContentResolver;
+import android.os.Build;
+import android.media.MediaScannerConnection;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -32,6 +37,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -757,16 +763,68 @@ public class MainActivity extends Activity {
                 if (original == null || original.trim().isEmpty()) original = "received-file";
                 original = new File(original).getName().replaceAll("[^\\p{L}\\p{N}._ -]", "_");
                 if (original.length() > 100) original = original.substring(original.length()-100);
-                File dir = getExternalFilesDir(null);
-                if (dir == null) dir = getFilesDir();
-                File dest = new File(dir, System.currentTimeMillis() + "_" + original);
+                String lower = original.toLowerCase(java.util.Locale.ROOT);
+                String mime = getContentResolver().getType(Uri.fromFile(new File(tempPath)));
+                if (mime == null || mime.equals("application/octet-stream")) {
+                    if (lower.matches(".*\\\\.(jpg|jpeg|png|gif|webp|heic|bmp)$")) mime = "image/" + (lower.endsWith(".jpg") || lower.endsWith(".jpeg") ? "jpeg" : lower.substring(lower.lastIndexOf('.') + 1));
+                    else if (lower.matches(".*\\\\.(mp4|m4v|3gp|mov|mkv|webm)$")) mime = "video/" + lower.substring(lower.lastIndexOf('.') + 1);
+                    else if (lower.matches(".*\\\\.(mp3|m4a|aac|wav|ogg|flac)$")) mime = "audio/" + lower.substring(lower.lastIndexOf('.') + 1);
+                    else mime = "application/octet-stream";
+                }
+                String folder = "Download/أبو وسام SHARE";
+                Uri savedUri = null;
+                OutputStream out = null;
                 long total = new File(tempPath).length();
                 updateProgress(0, total, "استقبال: " + original);
-                try (InputStream in = new FileInputStream(tempPath); FileOutputStream out = new FileOutputStream(dest)) {
-                    byte[] buffer = new byte[highSpeed ? 262144 : 32768]; int count; long copied = 0;
-                    while ((count = in.read(buffer)) != -1) { out.write(buffer, 0, count); copied += count; updateProgress(copied, total, "حفظ: " + original); }
+                try {
+                    if (Build.VERSION.SDK_INT >= 29) {
+                        ContentValues values = new ContentValues();
+                        values.put(MediaStore.MediaColumns.DISPLAY_NAME, original);
+                        values.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+                        if (mime.startsWith("image/")) {
+                            folder = "Pictures/أبو وسام SHARE";
+                            values.put(MediaStore.MediaColumns.RELATIVE_PATH, folder);
+                            savedUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                        } else if (mime.startsWith("video/")) {
+                            folder = "Movies/أبو وسام SHARE";
+                            values.put(MediaStore.MediaColumns.RELATIVE_PATH, folder);
+                            savedUri = getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
+                        } else if (mime.startsWith("audio/")) {
+                            folder = "Music/أبو وسام SHARE";
+                            values.put(MediaStore.MediaColumns.RELATIVE_PATH, folder);
+                            savedUri = getContentResolver().insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
+                        } else {
+                            values.put(MediaStore.MediaColumns.RELATIVE_PATH, folder);
+                            savedUri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                        }
+                        if (savedUri == null) throw new java.io.IOException("تعذّر إنشاء ملف في مساحة التخزين العامة");
+                        out = getContentResolver().openOutputStream(savedUri);
+                    } else {
+                        File base;
+                        if (mime.startsWith("image/")) { base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES); folder = "Pictures/أبو وسام SHARE"; }
+                        else if (mime.startsWith("video/")) { base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES); folder = "Movies/أبو وسام SHARE"; }
+                        else if (mime.startsWith("audio/")) { base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC); folder = "Music/أبو وسام SHARE"; }
+                        else { base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS); folder = "Download/أبو وسام SHARE"; }
+                        File dir = new File(base, "أبو وسام SHARE");
+                        if (!dir.exists() && !dir.mkdirs()) throw new java.io.IOException("تعذّر إنشاء مجلد الاستقبال");
+                        File dest = new File(dir, original);
+                        int suffix = 1;
+                        while (dest.exists()) dest = new File(dir, (suffix++) + "_" + original);
+                        savedUri = Uri.fromFile(dest);
+                        out = new FileOutputStream(dest);
+                    }
+                    if (out == null) throw new java.io.IOException("تعذّر فتح ملف الحفظ");
+                    try (InputStream in = new FileInputStream(tempPath); OutputStream target = out) {
+                        byte[] buffer = new byte[highSpeed ? 262144 : 32768]; int count; long copied = 0;
+                        while ((count = in.read(buffer)) != -1) { target.write(buffer, 0, count); copied += count; updateProgress(copied, total, "حفظ: " + original); }
+                        target.flush();
+                    }
+                    if (Build.VERSION.SDK_INT < 29 && savedUri != null) MediaScannerConnection.scanFile(MainActivity.this, new String[]{savedUri.getPath()}, new String[]{mime}, null);
+                } catch (Exception saveError) {
+                    if (savedUri != null && Build.VERSION.SDK_INT >= 29) try { getContentResolver().delete(savedUri, null, null); } catch (Exception ignored) {}
+                    throw saveError;
                 }
-                String page = "<html lang='ar' dir='rtl'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;padding:24px'><h2>تم استلام الملف</h2><p>" + escape(original) + "</p><p>حُفظ داخل مجلد التطبيق. يمكنك العودة للصفحة الرئيسية لإرسال ملفات أخرى.</p><a href='/'>عودة</a></body></html>";
+                String page = "<html lang='ar' dir='rtl'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;padding:24px'><h2>تم استلام الملف بنجاح</h2><p>" + escape(original) + "</p><p>تم الحفظ في: " + escape(folder) + "</p><p>ستظهر الصور في الاستديو والفيديوهات في مشغل الفيديو، بحسب تطبيقات هاتفك.</p><a href='/'>عودة</a></body></html>";
                 return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", page);
             } catch (Exception e) {
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "فشل استقبال الملف: " + e.getMessage());
