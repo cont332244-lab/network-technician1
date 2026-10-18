@@ -320,7 +320,7 @@ public class MainActivity extends Activity {
         integrator.setDesiredBarcodeFormats(com.google.zxing.integration.android.IntentIntegrator.QR_CODE);
         integrator.setPrompt("امسح رمز الاستقبال إذا لم يظهر الجهاز");
         integrator.setBeepEnabled(false);
-        integrator.setOrientationLocked(false);
+        integrator.setOrientationLocked(true);
         integrator.initiateScan();
     }
 
@@ -468,6 +468,32 @@ public class MainActivity extends Activity {
         web.loadUrl(url);
     }
 
+    private void showReceiveQrDialog(String address) {
+        if (qrView == null || !(qrView.getDrawable() instanceof android.graphics.drawable.BitmapDrawable)) return;
+        Bitmap qrBitmap = ((android.graphics.drawable.BitmapDrawable) qrView.getDrawable()).getBitmap();
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER);
+        content.setPadding(dp(20), dp(12), dp(20), dp(8));
+        ImageView dialogQr = new ImageView(this);
+        dialogQr.setImageBitmap(qrBitmap);
+        dialogQr.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        content.addView(dialogQr, new LinearLayout.LayoutParams(dp(230), dp(230)));
+        TextView addressText = new TextView(this);
+        addressText.setText(address + "\\nافتح الإرسال في الهاتف الآخر وامسح هذا الرمز");
+        addressText.setTextColor(0xFF24213A);
+        addressText.setTextSize(14);
+        addressText.setGravity(Gravity.CENTER);
+        addressText.setPadding(0, dp(8), 0, dp(4));
+        content.addView(addressText, new LinearLayout.LayoutParams(-1, -2));
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("أبو وسام SHARE — استقبال")
+            .setView(content)
+            .setPositiveButton("تم", (dialog, which) -> dialog.dismiss())
+            .setOnCancelListener(dialog -> {})
+            .show();
+    }
+
     private void showQr(String text) {
         try {
             com.google.zxing.common.BitMatrix matrix = new QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 600, 600);
@@ -602,6 +628,7 @@ public class MainActivity extends Activity {
             if (ip == null) ip = "تعذّر تحديد IP؛ تأكد من اتصال Wi‑Fi";
             status.setText("جاهز للاستقبال — دع الهاتف الآخر يضغط إرسال ويمسح الرمز.\nhttp://" + ip + ":8765\nالوضع: " + (highSpeed ? "سرعة عالية" : "سرعة عادية"));
             showQr("http://" + ip + ":8765");
+            showReceiveQrDialog("http://" + ip + ":8765");
             startDiscoveryResponder();
             speedHandler.removeCallbacks(speedTicker);
             speedHandler.post(speedTicker);
